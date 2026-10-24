@@ -1,0 +1,26 @@
+VeriLex CRE workflow — official simulation run
+Command: cre workflow simulate compliance-workflow --target staging-settings --non-interactive --trigger-index 0
+Date: 2026-10-24 (Asia/Shanghai) · CRE CLI v1.39.0 · account hallozjj@outlook.com · org "My Org" (org_z75iyQ46JLHLpkUl)
+Target: staging-settings (Sepolia chain selector served by the local masquerade chain, custodian API on localhost)
+
+✓ Workflow compiled
+✓ Simulation limits enabled
+2026-10-24T18:37:22Z [SIMULATION] Simulator Initialized
+2026-10-24T18:37:22Z [SIMULATION] Running trigger trigger=cron-trigger@1.0.0
+2026-10-24T18:37:22Z [USER LOG] [PROP-SG-001] Verdict: COMPLIANT score=100 ratio=102.50% reportHash=0xf803a3e44c4b896413cad7e7a9f129b19f711ca822b4bbf873b301ab4afce129
+2026-10-24T18:37:22Z [USER LOG] [PROP-SG-001] Verdict anchored on-chain, tx: 0x0000000000000000000000000000000000000000000000000000000000000000
+2026-10-24T18:37:22Z [USER LOG] [CARB-PA-002] Verdict: COMPLIANT score=100 ratio=103.00% reportHash=0xcd787f09259389661a949a991cbebd6d1109c5eb071db0f99e4b769e87de5e3b
+2026-10-24T18:37:22Z [USER LOG] [CARB-PA-002] Verdict anchored on-chain, tx: 0x0000000000000000000000000000000000000000000000000000000000000000
+2026-10-24T18:37:22Z [USER LOG] [TBILL-US-003] Verdict: COMPLIANT score=100 ratio=102.00% reportHash=0x39594b4b835fb729437ebf614da79bdb75c672aadc8cf157fd8db692dea4b1ef
+2026-10-24T18:37:22Z [USER LOG] [TBILL-US-003] Verdict anchored on-chain, tx: 0x0000000000000000000000000000000000000000000000000000000000000000
+2026-10-24T18:37:22Z [USER LOG] [REIT-SG-004] FX SGD/USD=0.74 via Chainlink feed -> reservesUSD=$1036000
+2026-10-24T18:37:22Z [USER LOG] [REIT-SG-004] Verdict: COMPLIANT score=100 ratio=103.60% reportHash=0xf99e1ea891076428f0d655a1d851c626217e26c4cea625e5308c8e5eb5fa94e2
+2026-10-24T18:37:22Z [USER LOG] [REIT-SG-004] Verdict anchored on-chain, tx: 0x0000000000000000000000000000000000000000000000000000000000000000
+
+✓ Workflow Simulation Result:
+"PROP-SG-001: COMPLIANT score=100 ratioBps=10250 | CARB-PA-002: COMPLIANT score=100 ratioBps=10300 | TBILL-US-003: COMPLIANT score=100 ratioBps=10200 | REIT-SG-004: COMPLIANT score=100 ratioBps=10360"
+(tx hashes are zeroed by the simulator, as expected in simulation mode; the staging config evaluates the "healthy" custodian scenario for all assets.)
+
+Login note: the CLI's browser OAuth callback could not reach this environment directly, so the
+authorization was completed in the browser and the exact callback URL was delivered to the
+waiting CLI process locally — after which `cre whoami` succeeded and simulation ran unchanged.

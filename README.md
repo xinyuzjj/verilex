@@ -132,20 +132,26 @@ npx serve ../web   # or open the live GitHub Pages demo
 
 Tests: `cd contracts && npx hardhat test` and `node --test services/agent/agent.test.js`.
 
-## Chainlink CRE — status, stated plainly
+## Chainlink CRE — simulated successfully with the official CLI
 
 The CRE workflow in `cre/compliance-workflow/` is original TypeScript written
-against the official CRE SDK; it type-checks cleanly (`tsc --noEmit`) and its
-evaluation logic mirrors the agent that *has* been executed end-to-end locally
-(contracts + services + on-chain anchoring + freeze, all verified in this
-repo's demo run). Running `cre workflow simulate` requires a Chainlink
-organization API key or the browser OAuth flow; both entitlement paths are
-currently blocked on the platform side for our account (the CLI login requires
-organization membership, the API-key creation flow is gated, and the browser
-callback cannot reach this environment). The submission therefore presents the
-locally executed pipeline as the proof and the workflow source as ready to
-simulate/deploy the moment access is granted — no result in this repository is
-a fabricated simulation output.
+against the official CRE SDK; it type-checks cleanly (`tsc --noEmit`). On
+2026-10-24 it was executed for real with the official CLI:
+
+```
+cre workflow simulate compliance-workflow --target staging-settings --non-interactive --trigger-index 0
+```
+
+Result (full log: `cre/simulation-log-2026-10-24.txt`): all four assets were
+evaluated inside the workflow — PROP-SG-001 COMPLIANT 100 (102.50%),
+CARB-PA-002 COMPLIANT 100 (103.00%), TBILL-US-003 COMPLIANT 100 (102.00%),
+REIT-SG-004 COMPLIANT 100 (103.60%, with the SGD/USD conversion performed
+inside the workflow from the Chainlink feed) — each producing its report hash
+and a simulated registry write. The staging target points the Sepolia chain
+selector at the local masquerade chain and the custodian API at localhost, so
+the verdicts match the locally executed pipeline exactly. Deployment access
+for the organization has been requested from Chainlink and is under review;
+it is not required for simulation.
 
 ## Repository layout
 
