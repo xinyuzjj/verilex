@@ -93,6 +93,13 @@ const server = http.createServer((req, res) => {
   const m = url.pathname.match(/^\/assets\/([^/]+)\/attestation$/);
   if (m) {
     const scenario = url.searchParams.get("scenario") || "healthy";
+    // Reject unknown scenarios instead of silently serving the healthy one:
+    // a typo must never make a demo (or a check) report the wrong state.
+    if (!["healthy", "atrisk", "breach"].includes(scenario)) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: `unknown scenario: ${scenario}` }));
+      return;
+    }
     const data = attestation(decodeURIComponent(m[1]), scenario);
     if (!data) {
       res.statusCode = 404;

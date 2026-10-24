@@ -52,6 +52,7 @@ contract ComplianceRegistry is Ownable {
     }
 
     function setReporter(address reporter_) external onlyOwner {
+        require(reporter_ != address(0), "zero reporter");
         reporter = reporter_;
         emit ReporterUpdated(reporter_);
     }
@@ -59,6 +60,7 @@ contract ComplianceRegistry is Ownable {
     event ForwarderUpdated(address indexed forwarder);
 
     function setForwarder(address forwarder_) external onlyOwner {
+        require(forwarder_ != address(0), "zero forwarder");
         forwarder = forwarder_;
         emit ForwarderUpdated(forwarder_);
     }
@@ -66,8 +68,11 @@ contract ComplianceRegistry is Ownable {
     /// @notice Chainlink CRE entry point. The CRE workflow delivers a signed
     ///         report whose payload is abi.encode(token, reserveRatioBps,
     ///         status, reportHash). Called by the Keystone forwarder.
+    /// @dev Fail-closed: until the owner configures a forwarder, onReport
+    ///      rejects every caller. A compliance anchor must never accept
+    ///      unauthenticated verdicts just because setup is incomplete.
     function onReport(bytes calldata /* metadata */, bytes calldata report) external {
-        require(forwarder == address(0) || msg.sender == forwarder, "not forwarder");
+        require(forwarder != address(0) && msg.sender == forwarder, "not forwarder");
         (address token, uint256 reserveRatioBps, Status status, bytes32 reportHash) = abi.decode(
             report,
             (address, uint256, Status, bytes32)
@@ -95,6 +100,8 @@ contract ComplianceRegistry is Ownable {
         Status status,
         bytes32 reportHash
     ) internal {
+        require(token != address(0), "zero token");
+        require(status != Status.Unknown, "unknown status");
         Report memory r = Report({
             timestamp: block.timestamp,
             reserveRatioBps: reserveRatioBps,

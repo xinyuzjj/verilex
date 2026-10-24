@@ -29,7 +29,7 @@ trustless way to know that a token is still fully backed and legally sound.
 4. **Agent evaluation** — a transparent rule set (reserve coverage ≥ 100%,
    licence in force, legal doc anchored, audit ≤ 180 days old) produces a
    verdict — COMPLIANT / AT-RISK / BREACH — plus a reasoning trail that is
-   hashed (keccak256).
+   hashed (SHA-256 in the agent service).
 5. **EVM write** — a DON-signed report carrying
    `(token, reserveRatioBps, status, reportHash)` is delivered to the
    `ComplianceRegistry` contract via `onReport()`, creating a permanent,
@@ -67,6 +67,9 @@ node services/custodian-api/server.js                    # :8787
 # 3. Standalone agent + dashboard (optional, no CRE account needed)
 node services/agent/agent.js --serve                     # :8788
 #    open web/index.html via any static server
+#    …or anchor all three scenario verdicts on-chain in one go:
+cd contracts && TOKEN_ADDRESS=<asset> REGISTRY_ADDRESS=<registry> \
+  npx hardhat run scripts/submit-demo-reports.ts --network localhost
 
 # 4. The CRE workflow itself
 cd cre/compliance-workflow && bun install
@@ -80,6 +83,44 @@ For a public-testnet run, point the `production-settings` RPC in
 `--network sepolia`, set the registry's forwarder to the Chainlink Keystone
 forwarder on Sepolia, and simulate with `--target production-settings`
 (add `--broadcast` to send real transactions).
+
+## Security model
+
+The registry is a compliance anchor, so its write paths are deliberately
+conservative:
+
+- **Fail-closed CRE delivery.** `onReport()` rejects every caller until the
+  owner configures the Chainlink Keystone forwarder, and afterwards accepts
+  reports from that forwarder only. An unconfigured contract can never be
+  filled with unauthenticated verdicts.
+- **Least-privilege direct path.** `submitReport()` is restricted to a single
+  owner-appointed `reporter` (used for local/demo runs); the owner can rotate
+  it, and zero addresses are rejected for both roles.
+- **Input validation.** Reports for the zero token address or with the
+  `Unknown` status are rejected on-chain.
+- **Trusted parties, named.** The custodian attestation is trusted input —
+  in production it must come from the asset's regulated trustee (the CRE
+  workflow fetches it with DON consensus). The contract owner can mint
+  `TokenizedAsset` supply and appoint the reporter/forwarder; those powers
+  are explicit, not hidden.
+- **Known limits.** The verdict itself is computed off-chain by design (the
+  evidence lives off-chain; only its hash is anchored). A newer report
+  replaces the "latest" pointer while the full history stays append-only, so
+  consumers should read the history and the timestamps, not just the latest
+  entry.
+
+## Testing
+
+- **Contracts** — `cd contracts && npm test` (Hardhat): 13 tests covering
+  access control, the fail-closed `onReport` path, input validation,
+  append-only history invariants, and end-to-end anchoring of all three
+  verdict scenarios.
+- **Agent** — `node --test services/agent/agent.test.js`: 8 tests covering
+  the four rule checks, verdict boundaries (100% / 95% coverage lines),
+  report-hash behaviour and input validation.
+- **Static analysis** — Slither (102 detectors) reports no findings on the
+  project contracts beyond an informational note about pragma ranges inside
+  OpenZeppelin dependencies; the compiler itself is pinned to 0.8.24.
 
 ## Design notes
 

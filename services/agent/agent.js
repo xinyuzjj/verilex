@@ -39,6 +39,17 @@ function daysBetween(a, b) {
 }
 
 function evaluate(att, totalSupply) {
+  // Validate before dividing: a zero or malformed supply would otherwise
+  // turn the coverage ratio into Infinity/NaN and corrupt the verdict.
+  if (!Number.isFinite(totalSupply) || totalSupply <= 0) {
+    throw new Error("totalSupply must be a positive number");
+  }
+  if (!att || !Number.isFinite(att.reservesUSD) || att.reservesUSD < 0) {
+    throw new Error("attestation reservesUSD must be a non-negative number");
+  }
+  if (!att.legal || !att.legal.licenseValidUntil || !att.legal.lastAudit) {
+    throw new Error("attestation is missing legal status fields");
+  }
   const now = new Date();
   const checks = [];
   let worst = STATUS.COMPLIANT;
@@ -204,11 +215,14 @@ function serve() {
       req.on("end", async () => {
         try {
           const p = JSON.parse(body || "{}");
+          // The custodian endpoint is operator configuration (env/CLI only).
+          // It is deliberately NOT taken from the request body: letting any
+          // caller point the agent at an arbitrary URL would turn /analyze
+          // into a server-side request forgery vector.
           const report = await analyze({
             assetId: p.assetId || "PROP-SG-001",
             totalSupply: Number(p.totalSupply ?? 1000000),
             scenario: p.scenario,
-            custodianUrl: p.custodianUrl,
           });
           res.end(JSON.stringify(report, null, 2));
         } catch (e) {
