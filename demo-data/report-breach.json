@@ -1,0 +1,44 @@
+{
+  "assetId": "PROP-SG-001",
+  "assetName": "Harbor Tower Commercial Note",
+  "generatedAt": "2026-10-24T06:03:09.881Z",
+  "custodianAsOf": "2026-10-24T06:03:09.873Z",
+  "totalSupply": 1000000,
+  "claimsUSD": 1000000,
+  "reservesUSD": 881500,
+  "reserveRatioBps": 8815,
+  "status": "breach",
+  "statusCode": 3,
+  "checks": [
+    {
+      "check": "reserve_coverage",
+      "observed": "88.15% (reserves $881500 vs claims $1000000)",
+      "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+      "result": "breach",
+      "explanation": "Material reserve shortfall: claims exceed attested reserves by more than 5%."
+    },
+    {
+      "check": "custodian_licence",
+      "observed": "valid until 2026-10-18 (-6 days)",
+      "threshold": "expired = breach; expiring within 30 days = at-risk",
+      "result": "breach",
+      "explanation": "The custodian's licence has lapsed; reserves are held by an unlicensed entity."
+    },
+    {
+      "check": "legal_doc_anchor",
+      "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+      "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+      "result": "compliant",
+      "explanation": "Governing legal documents are hashed and anchored for verification."
+    },
+    {
+      "check": "audit_freshness",
+      "observed": "last audit 2026-09-14 by KPMG (demo data), opinion \"unqualified\" (40 days ago)",
+      "threshold": "audit must be <= 180 days old",
+      "result": "compliant",
+      "explanation": "Independent audit is recent."
+    }
+  ],
+  "custodianNotes": "Custodian licence lapsed 6 days ago; reserve shortfall unexplained.",
+  "reportHash": "0xd4dbac130ea64fd5bb8a27beaf5dde3998b25ab2b2ba5161fff9c995f71ce894"
+}
