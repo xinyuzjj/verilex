@@ -1,16 +1,20 @@
 /**
- * VeriLex compliance workflow (Chainlink CRE, TypeScript).
+ * VeriLex compliance workflow v2 (Chainlink CRE, TypeScript).
  *
- * On a cron schedule this workflow:
- *   1. Fetches the custodian's attestation for a tokenized real-world asset
- *      (reserves, custodian licence, legal document anchor, last audit) over
+ * On a cron schedule this workflow sweeps a whole portfolio of tokenized
+ * real-world assets. For each asset it:
+ *   1. Fetches the custodian's attestation (reserves + legal status) over
  *      HTTP, with DON consensus over the parsed fields.
- *   2. Reads the asset token's totalSupply() on-chain via the EVM capability.
- *   3. Evaluates a transparent compliance rule set (the same rules as the
- *      off-chain VeriLex agent) and builds a reasoning trail.
- *   4. Anchors the verdict on-chain: the trail is hashed and a DON-signed
- *      report carrying (token, reserveRatioBps, status, reportHash) is
- *      delivered to the ComplianceRegistry consumer contract via onReport().
+ *   2. Reads the token's totalSupply() on-chain via the EVM capability, and —
+ *      for foreign-currency reserves — the Chainlink Data Feed price via the
+ *      FeedConsumer contract, converting reserves to USD on-chain data only.
+ *   3. Evaluates the versioned compliance policy (verilex-policy-2.0, the
+ *      same rules and penalties as the off-chain VeriLex agent) producing a
+ *      verdict and a 0-100 compliance score with a reasoning trail.
+ *   4. Anchors the verdict on-chain: a DON-signed report carrying
+ *      (token, reserveRatioBps, status, score, reportHash, policyHash) is
+ *      delivered to ComplianceRegistry via onReport(). Gated tokens read
+ *      the anchored status and freeze their own transfers on BREACH.
  */
 import {
   CronCapability,
@@ -46,10 +50,11 @@ import { z } from "zod"
 
 const configSchema = z.object({
   schedule: z.string(),
-  custodianApiUrl: z.string(),
+  custodianApiBaseUrl: z.string(),
   scenario: z.string().optional(),
   chainSelectorName: z.string(),
-  tokenAddress: z.string(),
+  assets: z.array(z.object({ assetId: z.string(), tokenAddress: z.string() })),
+  feedConsumerAddress: z.string(),
   registryAddress: z.string(),
   gasLimit: z.string(),
   writeEnabled: z.boolean(),
@@ -57,22 +62,34 @@ const configSchema = z.object({
 
 type Config = z.infer<typeof configSchema>
 
-// Flat, consensus-friendly view of the custodian attestation.
+// SHA-256 of the canonical policy document (services/agent/agent.js POLICY).
+// Anchored with every verdict so a score can be tied to the exact rules.
+const POLICY_HASH = "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+const POLICY_VERSION = "verilex-policy-2.0"
+
+// Flat, consensus-friendly view of a custodian attestation.
 type AttestationData = {
-  reservesUSD: number
+  reservesAmount: number
+  currencyCode: string
   licenseDaysRemaining: number
   auditAgeDays: number
   docHashOk: number // 1 = legal doc hash present and well-formed
+  sanctionsFlag: number // 1 = a counterparty was flagged by screening
+  docReviewOverdueDays: number // > 0 = the legal doc review is overdue
+  attestationAgeHours: number
   unitClaimUSD: number
   docHash: string
 }
 
 const DAY_MS = 86_400_000
+const HOUR_MS = 3_600_000
 
-const fetchAttestation = (sendRequester: HTTPSendRequester, config: Config): AttestationData => {
-  const url = config.scenario
-    ? `${config.custodianApiUrl}?scenario=${config.scenario}`
-    : config.custodianApiUrl
+type FetchArgs = Config & { assetId: string }
+
+const fetchAttestation = (sendRequester: HTTPSendRequester, args: FetchArgs): AttestationData => {
+  const url = args.scenario
+    ? `${args.custodianApiBaseUrl}/assets/${args.assetId}/attestation?scenario=${args.scenario}`
+    : `${args.custodianApiBaseUrl}/assets/${args.assetId}/attestation`
   const resp = sendRequester.sendRequest({ url, method: "GET" as const }).result()
   if (resp.statusCode !== 200) {
     throw new Error(`Custodian API returned status ${resp.statusCode}`)
@@ -85,13 +102,22 @@ const fetchAttestation = (sendRequester: HTTPSendRequester, config: Config): Att
   const auditAgeDays = Math.floor(
     (now - new Date(body.legal.lastAudit.date + "T00:00:00Z").getTime()) / DAY_MS
   )
+  const docReviewOverdueDays = body.legal.docReviewDue
+    ? Math.floor((now - new Date(body.legal.docReviewDue + "T00:00:00Z").getTime()) / DAY_MS)
+    : 0
+  const attestationAgeHours = body.asOf
+    ? Math.max(0, Math.floor((now - new Date(body.asOf).getTime()) / HOUR_MS))
+    : 9999
   const docHash: string = body.legal.docHash ?? ""
-  const docHashOk = /^0x[0-9a-fA-F]{64}$/.test(docHash) ? 1 : 0
   return {
-    reservesUSD: body.reservesUSD,
+    reservesAmount: body.reservesAmount,
+    currencyCode: body.currency ?? "USD",
     licenseDaysRemaining,
     auditAgeDays,
-    docHashOk,
+    docHashOk: /^0x[0-9a-fA-F]{64}$/.test(docHash) ? 1 : 0,
+    sanctionsFlag: body.legal.sanctionsScreening?.status === "clear" ? 0 : 1,
+    docReviewOverdueDays,
+    attestationAgeHours,
     unitClaimUSD: body.unitClaimUSD ?? 1,
     docHash,
   }
@@ -102,7 +128,23 @@ const COMPLIANT = 1
 const ATRISK = 2
 const BREACH = 3
 
-const onCronTrigger = (runtime: Runtime<Config>): string => {
+// Score penalties — identical to the agent's verilex-policy-2.0 table.
+const PENALTIES: Record<string, { breach: number; atRisk: number }> = {
+  reserve_coverage: { breach: 45, atRisk: 15 },
+  custodian_licence: { breach: 35, atRisk: 10 },
+  sanctions_screening: { breach: 40, atRisk: 0 },
+  legal_doc_anchor: { breach: 25, atRisk: 0 },
+  attestation_freshness: { breach: 20, atRisk: 10 },
+  audit_freshness: { breach: 0, atRisk: 10 },
+  doc_review_currency: { breach: 0, atRisk: 8 },
+}
+
+const evaluateAsset = (
+  runtime: Runtime<Config>,
+  evmClient: EVMClient,
+  assetId: string,
+  tokenAddress: string
+): string => {
   const config = runtime.config
 
   // 1. Custodian attestation via HTTP capability (DON consensus per field).
@@ -112,87 +154,123 @@ const onCronTrigger = (runtime: Runtime<Config>): string => {
       runtime,
       fetchAttestation,
       ConsensusAggregationByFields<AttestationData>({
-        reservesUSD: median<number>(),
-        licenseDaysRemaining: median<number>(),
-        auditAgeDays: median<number>(),
-        docHashOk: median<number>(),
-        unitClaimUSD: median<number>(),
-        docHash: identical<string>(),
+        reservesAmount: median,
+        currencyCode: identical,
+        licenseDaysRemaining: median,
+        auditAgeDays: median,
+        docHashOk: median,
+        sanctionsFlag: median,
+        docReviewOverdueDays: median,
+        attestationAgeHours: median,
+        unitClaimUSD: median,
+        docHash: identical,
       })
-    )(config)
+    )({ ...config, assetId })
     .result()
-  runtime.log(
-    `Attestation: reserves=$${att.reservesUSD} licenceDays=${att.licenseDaysRemaining} auditAgeDays=${att.auditAgeDays} docHashOk=${att.docHashOk}`
-  )
 
-  // 2. On-chain circulating supply via EVM capability.
-  const network = getNetwork({ chainFamily: "evm", chainSelectorName: config.chainSelectorName })
-  if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
-  const evmClient = new EVMClient(network.chainSelector.selector)
-
+  // 2a. On-chain circulating supply via EVM capability.
   const erc20Abi = parseAbi(["function totalSupply() view returns (uint256)"])
-  const callData = encodeFunctionData({ abi: erc20Abi, functionName: "totalSupply" })
-  const callResp = evmClient
+  const supplyCall = encodeFunctionData({ abi: erc20Abi, functionName: "totalSupply" })
+  const supplyResp = evmClient
     .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.tokenAddress as Address,
-        data: callData,
-      }),
+      call: encodeCallMsg({ from: zeroAddress, to: tokenAddress as Address, data: supplyCall }),
       blockNumber: LATEST_BLOCK_NUMBER,
     })
     .result()
   const supplyRaw = decodeFunctionResult({
     abi: erc20Abi,
     functionName: "totalSupply",
-    data: bytesToHex(callResp.data),
+    data: bytesToHex(supplyResp.data),
   }) as bigint
-  const supply = Number(formatUnits(supplyRaw, 18)) // demo asset uses 18 decimals
-  runtime.log(`On-chain totalSupply: ${supply}`)
+  const supply = Number(formatUnits(supplyRaw, 18))
 
-  // 3. Evaluate the compliance rule set (mirrors services/agent/agent.js).
-  const claimsUSD = supply * att.unitClaimUSD
-  const ratioBps = claimsUSD > 0 ? Math.floor((att.reservesUSD / claimsUSD) * 10000) : 0
-  let status = COMPLIANT
-  const checks: Record<string, unknown>[] = []
-  const raise = (level: number) => {
-    if (level > status) status = level
+  // 2b. FX conversion through the Chainlink Data Feed consumer (if needed).
+  let reservesUSD = att.reservesAmount
+  let fxRate: number | null = null
+  if (att.currencyCode !== "USD") {
+    const feedAbi = parseAbi([
+      "function latestPrice() view returns (int256 price, uint256 updatedAt)",
+      "function decimals() view returns (uint8)",
+    ])
+    const priceResp = evmClient
+      .callContract(runtime, {
+        call: encodeCallMsg({
+          from: zeroAddress,
+          to: config.feedConsumerAddress as Address,
+          data: encodeFunctionData({ abi: feedAbi, functionName: "latestPrice" }),
+        }),
+        blockNumber: LATEST_BLOCK_NUMBER,
+      })
+      .result()
+    const [price] = decodeFunctionResult({
+      abi: feedAbi,
+      functionName: "latestPrice",
+      data: bytesToHex(priceResp.data),
+    }) as unknown as [bigint, bigint]
+    const decResp = evmClient
+      .callContract(runtime, {
+        call: encodeCallMsg({
+          from: zeroAddress,
+          to: config.feedConsumerAddress as Address,
+          data: encodeFunctionData({ abi: feedAbi, functionName: "decimals" }),
+        }),
+        blockNumber: LATEST_BLOCK_NUMBER,
+      })
+      .result()
+    const feedDecimals = decodeFunctionResult({
+      abi: feedAbi,
+      functionName: "decimals",
+      data: bytesToHex(decResp.data),
+    }) as number
+    fxRate = Number(price) / 10 ** feedDecimals
+    reservesUSD = Math.round(att.reservesAmount * fxRate)
+    runtime.log(`[${assetId}] FX ${att.currencyCode}/USD=${fxRate} via Chainlink feed -> reservesUSD=$${reservesUSD}`)
   }
 
-  const reserveLevel = ratioBps >= 10000 ? COMPLIANT : ratioBps >= 9500 ? ATRISK : BREACH
-  checks.push({ check: "reserve_coverage", reserveRatioBps: ratioBps, result: reserveLevel })
-  raise(reserveLevel)
+  // 3. Evaluate verilex-policy-2.0 (mirrors services/agent/agent.js).
+  const claimsUSD = supply * att.unitClaimUSD
+  const ratioBps = claimsUSD > 0 ? Math.floor((reservesUSD / claimsUSD) * 10000) : 0
+  let status = COMPLIANT
+  let penalty = 0
+  const checks: Record<string, unknown>[] = []
+  const raise = (check: string, level: number, observed: Record<string, unknown>) => {
+    checks.push({ check, ...observed, result: level })
+    if (level > status) status = level
+    const p = PENALTIES[check]
+    if (p) penalty += level === BREACH ? p.breach : level === ATRISK ? p.atRisk : 0
+  }
 
-  const licenseLevel = att.licenseDaysRemaining < 0 ? BREACH : att.licenseDaysRemaining <= 30 ? ATRISK : COMPLIANT
-  checks.push({ check: "custodian_licence", licenseDaysRemaining: att.licenseDaysRemaining, result: licenseLevel })
-  raise(licenseLevel)
+  raise("reserve_coverage", ratioBps >= 10000 ? COMPLIANT : ratioBps >= 9500 ? ATRISK : BREACH, { reserveRatioBps: ratioBps })
+  raise("custodian_licence", att.licenseDaysRemaining < 0 ? BREACH : att.licenseDaysRemaining <= 30 ? ATRISK : COMPLIANT, { licenseDaysRemaining: att.licenseDaysRemaining })
+  raise("legal_doc_anchor", att.docHashOk >= 0.5 ? COMPLIANT : BREACH, { docHash: att.docHash })
+  raise("audit_freshness", att.auditAgeDays > 180 ? ATRISK : COMPLIANT, { auditAgeDays: att.auditAgeDays })
+  raise("attestation_freshness", att.attestationAgeHours <= 24 ? COMPLIANT : att.attestationAgeHours <= 72 ? ATRISK : BREACH, { attestationAgeHours: att.attestationAgeHours })
+  raise("sanctions_screening", att.sanctionsFlag >= 0.5 ? BREACH : COMPLIANT, { sanctionsFlag: att.sanctionsFlag })
+  raise("doc_review_currency", att.docReviewOverdueDays > 0 ? ATRISK : COMPLIANT, { docReviewOverdueDays: att.docReviewOverdueDays })
 
-  const docLevel = att.docHashOk >= 0.5 ? COMPLIANT : BREACH
-  checks.push({ check: "legal_doc_anchor", docHash: att.docHash, result: docLevel })
-  raise(docLevel)
-
-  const auditLevel = att.auditAgeDays > 180 ? ATRISK : COMPLIANT
-  checks.push({ check: "audit_freshness", auditAgeDays: att.auditAgeDays, result: auditLevel })
-  raise(auditLevel)
-
+  const score = Math.max(0, 100 - penalty)
   const statusName = status === COMPLIANT ? "COMPLIANT" : status === ATRISK ? "AT-RISK" : "BREACH"
   const trailJson = JSON.stringify({
-    token: config.tokenAddress,
+    assetId,
+    token: tokenAddress,
     supply,
     claimsUSD,
-    reservesUSD: att.reservesUSD,
+    reservesUSD,
+    fxRate,
     reserveRatioBps: ratioBps,
     status: statusName,
+    score,
+    policy: POLICY_VERSION,
     checks,
   })
   const reportHash = keccak256(stringToHex(trailJson))
-  runtime.log(`Verdict: ${statusName} | reserve ratio: ${(ratioBps / 100).toFixed(2)}% | reportHash: ${reportHash}`)
+  runtime.log(`[${assetId}] Verdict: ${statusName} score=${score} ratio=${(ratioBps / 100).toFixed(2)}% reportHash=${reportHash}`)
 
-  // 4. Anchor the verdict on-chain via a DON-signed report to the registry.
+  // 4. Anchor the verdict on-chain via a DON-signed report.
   if (config.writeEnabled) {
     const payload = encodeAbiParameters(
-      parseAbiParameters("address token, uint256 reserveRatioBps, uint8 status, bytes32 reportHash"),
-      [config.tokenAddress as Address, BigInt(ratioBps), status, reportHash]
+      parseAbiParameters("address token, uint256 reserveRatioBps, uint8 status, uint256 score, bytes32 reportHash, bytes32 policyHash"),
+      [tokenAddress as Address, BigInt(ratioBps), status, BigInt(score), reportHash, POLICY_HASH as `0x${string}`]
     )
     const report = runtime
       .report({
@@ -210,14 +288,27 @@ const onCronTrigger = (runtime: Runtime<Config>): string => {
       })
       .result()
     if (writeResult.txStatus !== TxStatus.SUCCESS) {
-      throw new Error(`On-chain write failed with status: ${writeResult.txStatus}`)
+      throw new Error(`On-chain write failed for ${assetId} with status: ${writeResult.txStatus}`)
     }
     const txHash = bytesToHex(writeResult.txHash || new Uint8Array(32))
-    runtime.log(`Verdict anchored on-chain, tx: ${txHash}`)
-    return `${statusName} ratioBps=${ratioBps} tx=${txHash}`
+    runtime.log(`[${assetId}] Verdict anchored on-chain, tx: ${txHash}`)
+    return `${assetId}: ${statusName} score=${score} ratioBps=${ratioBps} tx=${txHash}`
   }
 
-  return `${statusName} ratioBps=${ratioBps} reportHash=${reportHash}`
+  return `${assetId}: ${statusName} score=${score} ratioBps=${ratioBps} reportHash=${reportHash}`
+}
+
+const onCronTrigger = (runtime: Runtime<Config>): string => {
+  const config = runtime.config
+  const network = getNetwork({ chainFamily: "evm", chainSelectorName: config.chainSelectorName })
+  if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
+  const evmClient = new EVMClient(network.chainSelector.selector)
+
+  const results: string[] = []
+  for (const asset of config.assets) {
+    results.push(evaluateAsset(runtime, evmClient, asset.assetId, asset.tokenAddress))
+  }
+  return results.join(" | ")
 }
 
 const initWorkflow = (config: Config) => {

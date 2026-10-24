@@ -1,0 +1,6 @@
+{
+  "log": [
+    "transfer during BREACH reverted: Error: VM Exception while processing transaction: reverted with reason string 'compliance freeze: asset in bre",
+    "transfer succeeds again once the verdict clears BREACH (the sharp coverage swing is flagged by the drift check, then clears)"
+  ]
+}

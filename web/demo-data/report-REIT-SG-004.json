@@ -1,0 +1,92 @@
+{
+  "assetId": "REIT-SG-004",
+  "assetName": "Orchard Income REIT Units",
+  "generatedAt": "2026-10-24T09:46:15.292Z",
+  "custodianAsOf": "2026-10-24T09:46:15.291Z",
+  "policy": {
+    "version": "verilex-policy-2.0",
+    "hash": "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+  },
+  "totalSupply": 1000000,
+  "claimsUSD": 1000000,
+  "reservesUSD": 976800,
+  "reserveRatioBps": 9768,
+  "status": "at-risk",
+  "statusCode": 2,
+  "score": 85,
+  "fx": {
+    "currency": "SGD",
+    "rateUSD": 0.74,
+    "source": "chainlink-feed"
+  },
+  "checks": [
+    {
+      "check": "reserve_coverage",
+      "observed": "97.68% (reserves $976800 vs claims $1000000)",
+      "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+      "result": "at-risk",
+      "explanation": "Reserves cover most claims but sit below the 100% comfort line."
+    },
+    {
+      "check": "custodian_licence",
+      "observed": "valid until 2027-06-21 (240 days)",
+      "threshold": "expired = breach; expiring within 30 days = at-risk",
+      "result": "compliant",
+      "explanation": "Custodian licence is in force."
+    },
+    {
+      "check": "legal_doc_anchor",
+      "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+      "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+      "result": "compliant",
+      "explanation": "Governing legal documents are hashed and anchored for verification."
+    },
+    {
+      "check": "audit_freshness",
+      "observed": "last audit 2026-09-09 by KPMG (demo data), opinion \"unqualified\" (45 days ago)",
+      "threshold": "audit must be <= 180 days old",
+      "result": "compliant",
+      "explanation": "Independent audit is recent."
+    },
+    {
+      "check": "attestation_freshness",
+      "observed": "attested 0.0h ago",
+      "threshold": "<= 24h compliant; <= 72h at-risk; older = breach",
+      "result": "compliant",
+      "explanation": "The attestation is current."
+    },
+    {
+      "check": "sanctions_screening",
+      "observed": "screening status \"clear\" via Elliptic (demo)",
+      "threshold": "any flagged counterparty = breach until cleared",
+      "result": "compliant",
+      "explanation": "No sanctioned or high-risk counterparty exposure reported."
+    },
+    {
+      "check": "doc_review_currency",
+      "observed": "next review due 2027-03-23",
+      "threshold": "an overdue legal document review = at-risk",
+      "result": "compliant",
+      "explanation": "Legal documentation review is on schedule."
+    },
+    {
+      "check": "supply_drift",
+      "observed": "coverage moved 0.00 points since the previous check (97.68% -> 97.68%)",
+      "threshold": "movement over 5 points between checks = at-risk",
+      "result": "compliant",
+      "explanation": "Coverage is stable versus the previous check."
+    }
+  ],
+  "custodianNotes": "FX movement and a partial payout pulled USD coverage under 100%.",
+  "analyst": {
+    "headline": "Orchard Income REIT Units is AT-RISK (compliance score 85/100, reserve coverage 97.68%).",
+    "risks": [
+      "reserve_coverage: Reserves cover most claims but sit below the 100% comfort line."
+    ],
+    "remediations": [
+      "Top up the reserve account to restore coverage to at least 100%, or reduce circulating supply via redemption until coverage recovers."
+    ],
+    "outlook": "No immediate holder action is required, but the flagged controls should be remediated before the next check cycle; a downgrade to BREACH freezes transfers on gated tokens."
+  },
+  "reportHash": "0xf6d9f78d2d9a737f08ea3750dfadfdb85084c57c9c0390382bb625a9de41faf2"
+}

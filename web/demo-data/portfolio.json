@@ -1,0 +1,355 @@
+{
+  "generatedAt": "2026-10-24T09:46:15.494Z",
+  "reports": [
+    {
+      "assetId": "PROP-SG-001",
+      "assetName": "Harbor Tower Commercial Note",
+      "generatedAt": "2026-10-24T09:46:15.479Z",
+      "custodianAsOf": "2026-10-24T09:46:15.478Z",
+      "policy": {
+        "version": "verilex-policy-2.0",
+        "hash": "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+      },
+      "totalSupply": 1000000,
+      "claimsUSD": 1000000,
+      "reservesUSD": 1025000,
+      "reserveRatioBps": 10250,
+      "status": "compliant",
+      "statusCode": 1,
+      "score": 100,
+      "fx": null,
+      "checks": [
+        {
+          "check": "reserve_coverage",
+          "observed": "102.50% (reserves $1025000 vs claims $1000000)",
+          "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+          "result": "compliant",
+          "explanation": "Attested reserves fully cover the circulating token supply."
+        },
+        {
+          "check": "custodian_licence",
+          "observed": "valid until 2027-06-21 (240 days)",
+          "threshold": "expired = breach; expiring within 30 days = at-risk",
+          "result": "compliant",
+          "explanation": "Custodian licence is in force."
+        },
+        {
+          "check": "legal_doc_anchor",
+          "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+          "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+          "result": "compliant",
+          "explanation": "Governing legal documents are hashed and anchored for verification."
+        },
+        {
+          "check": "audit_freshness",
+          "observed": "last audit 2026-09-14 by KPMG (demo data), opinion \"unqualified\" (40 days ago)",
+          "threshold": "audit must be <= 180 days old",
+          "result": "compliant",
+          "explanation": "Independent audit is recent."
+        },
+        {
+          "check": "attestation_freshness",
+          "observed": "attested 0.0h ago",
+          "threshold": "<= 24h compliant; <= 72h at-risk; older = breach",
+          "result": "compliant",
+          "explanation": "The attestation is current."
+        },
+        {
+          "check": "sanctions_screening",
+          "observed": "screening status \"clear\" via Elliptic (demo)",
+          "threshold": "any flagged counterparty = breach until cleared",
+          "result": "compliant",
+          "explanation": "No sanctioned or high-risk counterparty exposure reported."
+        },
+        {
+          "check": "doc_review_currency",
+          "observed": "next review due 2027-02-21",
+          "threshold": "an overdue legal document review = at-risk",
+          "result": "compliant",
+          "explanation": "Legal documentation review is on schedule."
+        },
+        {
+          "check": "supply_drift",
+          "observed": "coverage moved 0.00 points since the previous check (102.50% -> 102.50%)",
+          "threshold": "movement over 5 points between checks = at-risk",
+          "result": "compliant",
+          "explanation": "Coverage is stable versus the previous check."
+        }
+      ],
+      "custodianNotes": "Reserves exceed circulating claims; all licences in force.",
+      "analyst": {
+        "headline": "Harbor Tower Commercial Note is COMPLIANT (compliance score 100/100, reserve coverage 102.50%).",
+        "risks": [],
+        "remediations": [],
+        "outlook": "No action required. The asset remains under continuous monitoring; the next scheduled check will re-verify every control."
+      },
+      "reportHash": "0x34a0ee51763ce63591f7bd326f27a7c1304c278485589f8ab82476dc5641b172"
+    },
+    {
+      "assetId": "CARB-PA-002",
+      "assetName": "BlueCarbon Credit Pool",
+      "generatedAt": "2026-10-24T09:46:15.175Z",
+      "custodianAsOf": "2026-10-24T09:46:15.174Z",
+      "policy": {
+        "version": "verilex-policy-2.0",
+        "hash": "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+      },
+      "totalSupply": 500000,
+      "claimsUSD": 500000,
+      "reservesUSD": 489000,
+      "reserveRatioBps": 9780,
+      "status": "at-risk",
+      "statusCode": 2,
+      "score": 75,
+      "fx": null,
+      "checks": [
+        {
+          "check": "reserve_coverage",
+          "observed": "97.80% (reserves $489000 vs claims $500000)",
+          "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+          "result": "at-risk",
+          "explanation": "Reserves cover most claims but sit below the 100% comfort line."
+        },
+        {
+          "check": "custodian_licence",
+          "observed": "valid until 2027-08-20 (300 days)",
+          "threshold": "expired = breach; expiring within 30 days = at-risk",
+          "result": "compliant",
+          "explanation": "Custodian licence is in force."
+        },
+        {
+          "check": "legal_doc_anchor",
+          "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+          "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+          "result": "compliant",
+          "explanation": "Governing legal documents are hashed and anchored for verification."
+        },
+        {
+          "check": "audit_freshness",
+          "observed": "last audit 2026-04-02 by KPMG (demo data), opinion \"unqualified\" (205 days ago)",
+          "threshold": "audit must be <= 180 days old",
+          "result": "at-risk",
+          "explanation": "Audit is stale; a fresh attestation audit should be commissioned."
+        },
+        {
+          "check": "attestation_freshness",
+          "observed": "attested 0.0h ago",
+          "threshold": "<= 24h compliant; <= 72h at-risk; older = breach",
+          "result": "compliant",
+          "explanation": "The attestation is current."
+        },
+        {
+          "check": "sanctions_screening",
+          "observed": "screening status \"clear\" via Elliptic (demo)",
+          "threshold": "any flagged counterparty = breach until cleared",
+          "result": "compliant",
+          "explanation": "No sanctioned or high-risk counterparty exposure reported."
+        },
+        {
+          "check": "doc_review_currency",
+          "observed": "next review due 2027-01-22",
+          "threshold": "an overdue legal document review = at-risk",
+          "result": "compliant",
+          "explanation": "Legal documentation review is on schedule."
+        },
+        {
+          "check": "supply_drift",
+          "observed": "coverage moved 0.00 points since the previous check (97.80% -> 97.80%)",
+          "threshold": "movement over 5 points between checks = at-risk",
+          "result": "compliant",
+          "explanation": "Coverage is stable versus the previous check."
+        }
+      ],
+      "custodianNotes": "Coverage thin and the last verification audit is stale.",
+      "analyst": {
+        "headline": "BlueCarbon Credit Pool is AT-RISK (compliance score 75/100, reserve coverage 97.80%).",
+        "risks": [
+          "reserve_coverage: Reserves cover most claims but sit below the 100% comfort line.",
+          "audit_freshness: Audit is stale; a fresh attestation audit should be commissioned."
+        ],
+        "remediations": [
+          "Top up the reserve account to restore coverage to at least 100%, or reduce circulating supply via redemption until coverage recovers.",
+          "Commission a fresh reserve attestation audit and publish the signed report."
+        ],
+        "outlook": "No immediate holder action is required, but the flagged controls should be remediated before the next check cycle; a downgrade to BREACH freezes transfers on gated tokens."
+      },
+      "reportHash": "0x9ac4f75dcf136f5d5c7e6aa4e292a2533026a900f82744abe70e62a1f5c6e75a"
+    },
+    {
+      "assetId": "TBILL-US-003",
+      "assetName": "Tokenized T-Bill Fund",
+      "generatedAt": "2026-10-24T09:46:15.236Z",
+      "custodianAsOf": "2026-10-24T09:46:15.234Z",
+      "policy": {
+        "version": "verilex-policy-2.0",
+        "hash": "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+      },
+      "totalSupply": 2000000,
+      "claimsUSD": 2000000,
+      "reservesUSD": 2040000,
+      "reserveRatioBps": 10200,
+      "status": "compliant",
+      "statusCode": 1,
+      "score": 100,
+      "fx": null,
+      "checks": [
+        {
+          "check": "reserve_coverage",
+          "observed": "102.00% (reserves $2040000 vs claims $2000000)",
+          "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+          "result": "compliant",
+          "explanation": "Attested reserves fully cover the circulating token supply."
+        },
+        {
+          "check": "custodian_licence",
+          "observed": "valid until 2027-11-28 (400 days)",
+          "threshold": "expired = breach; expiring within 30 days = at-risk",
+          "result": "compliant",
+          "explanation": "Custodian licence is in force."
+        },
+        {
+          "check": "legal_doc_anchor",
+          "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+          "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+          "result": "compliant",
+          "explanation": "Governing legal documents are hashed and anchored for verification."
+        },
+        {
+          "check": "audit_freshness",
+          "observed": "last audit 2026-09-24 by KPMG (demo data), opinion \"unqualified\" (30 days ago)",
+          "threshold": "audit must be <= 180 days old",
+          "result": "compliant",
+          "explanation": "Independent audit is recent."
+        },
+        {
+          "check": "attestation_freshness",
+          "observed": "attested 0.0h ago",
+          "threshold": "<= 24h compliant; <= 72h at-risk; older = breach",
+          "result": "compliant",
+          "explanation": "The attestation is current."
+        },
+        {
+          "check": "sanctions_screening",
+          "observed": "screening status \"clear\" via Elliptic (demo)",
+          "threshold": "any flagged counterparty = breach until cleared",
+          "result": "compliant",
+          "explanation": "No sanctioned or high-risk counterparty exposure reported."
+        },
+        {
+          "check": "doc_review_currency",
+          "observed": "next review due 2027-05-12",
+          "threshold": "an overdue legal document review = at-risk",
+          "result": "compliant",
+          "explanation": "Legal documentation review is on schedule."
+        },
+        {
+          "check": "supply_drift",
+          "observed": "coverage moved 0.00 points since the previous check (102.00% -> 102.00%)",
+          "threshold": "movement over 5 points between checks = at-risk",
+          "result": "compliant",
+          "explanation": "Coverage is stable versus the previous check."
+        }
+      ],
+      "custodianNotes": "T-bill holdings marked daily; coverage above target.",
+      "analyst": {
+        "headline": "Tokenized T-Bill Fund is COMPLIANT (compliance score 100/100, reserve coverage 102.00%).",
+        "risks": [],
+        "remediations": [],
+        "outlook": "No action required. The asset remains under continuous monitoring; the next scheduled check will re-verify every control."
+      },
+      "reportHash": "0x62dfd572036f436c7c9d2c2fab0ddce3e225ff94c405f18af2803f6341cc5d6f"
+    },
+    {
+      "assetId": "REIT-SG-004",
+      "assetName": "Orchard Income REIT Units",
+      "generatedAt": "2026-10-24T09:46:15.292Z",
+      "custodianAsOf": "2026-10-24T09:46:15.291Z",
+      "policy": {
+        "version": "verilex-policy-2.0",
+        "hash": "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+      },
+      "totalSupply": 1000000,
+      "claimsUSD": 1000000,
+      "reservesUSD": 976800,
+      "reserveRatioBps": 9768,
+      "status": "at-risk",
+      "statusCode": 2,
+      "score": 85,
+      "fx": {
+        "currency": "SGD",
+        "rateUSD": 0.74,
+        "source": "chainlink-feed"
+      },
+      "checks": [
+        {
+          "check": "reserve_coverage",
+          "observed": "97.68% (reserves $976800 vs claims $1000000)",
+          "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+          "result": "at-risk",
+          "explanation": "Reserves cover most claims but sit below the 100% comfort line."
+        },
+        {
+          "check": "custodian_licence",
+          "observed": "valid until 2027-06-21 (240 days)",
+          "threshold": "expired = breach; expiring within 30 days = at-risk",
+          "result": "compliant",
+          "explanation": "Custodian licence is in force."
+        },
+        {
+          "check": "legal_doc_anchor",
+          "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+          "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+          "result": "compliant",
+          "explanation": "Governing legal documents are hashed and anchored for verification."
+        },
+        {
+          "check": "audit_freshness",
+          "observed": "last audit 2026-09-09 by KPMG (demo data), opinion \"unqualified\" (45 days ago)",
+          "threshold": "audit must be <= 180 days old",
+          "result": "compliant",
+          "explanation": "Independent audit is recent."
+        },
+        {
+          "check": "attestation_freshness",
+          "observed": "attested 0.0h ago",
+          "threshold": "<= 24h compliant; <= 72h at-risk; older = breach",
+          "result": "compliant",
+          "explanation": "The attestation is current."
+        },
+        {
+          "check": "sanctions_screening",
+          "observed": "screening status \"clear\" via Elliptic (demo)",
+          "threshold": "any flagged counterparty = breach until cleared",
+          "result": "compliant",
+          "explanation": "No sanctioned or high-risk counterparty exposure reported."
+        },
+        {
+          "check": "doc_review_currency",
+          "observed": "next review due 2027-03-23",
+          "threshold": "an overdue legal document review = at-risk",
+          "result": "compliant",
+          "explanation": "Legal documentation review is on schedule."
+        },
+        {
+          "check": "supply_drift",
+          "observed": "coverage moved 0.00 points since the previous check (97.68% -> 97.68%)",
+          "threshold": "movement over 5 points between checks = at-risk",
+          "result": "compliant",
+          "explanation": "Coverage is stable versus the previous check."
+        }
+      ],
+      "custodianNotes": "FX movement and a partial payout pulled USD coverage under 100%.",
+      "analyst": {
+        "headline": "Orchard Income REIT Units is AT-RISK (compliance score 85/100, reserve coverage 97.68%).",
+        "risks": [
+          "reserve_coverage: Reserves cover most claims but sit below the 100% comfort line."
+        ],
+        "remediations": [
+          "Top up the reserve account to restore coverage to at least 100%, or reduce circulating supply via redemption until coverage recovers."
+        ],
+        "outlook": "No immediate holder action is required, but the flagged controls should be remediated before the next check cycle; a downgrade to BREACH freezes transfers on gated tokens."
+      },
+      "reportHash": "0xf6d9f78d2d9a737f08ea3750dfadfdb85084c57c9c0390382bb625a9de41faf2"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "assetId": "TBILL-US-003",
+  "assetName": "Tokenized T-Bill Fund",
+  "generatedAt": "2026-10-24T09:46:15.236Z",
+  "custodianAsOf": "2026-10-24T09:46:15.234Z",
+  "policy": {
+    "version": "verilex-policy-2.0",
+    "hash": "0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313"
+  },
+  "totalSupply": 2000000,
+  "claimsUSD": 2000000,
+  "reservesUSD": 2040000,
+  "reserveRatioBps": 10200,
+  "status": "compliant",
+  "statusCode": 1,
+  "score": 100,
+  "fx": null,
+  "checks": [
+    {
+      "check": "reserve_coverage",
+      "observed": "102.00% (reserves $2040000 vs claims $2000000)",
+      "threshold": ">=100% compliant; 95-99.99% at-risk; <95% breach",
+      "result": "compliant",
+      "explanation": "Attested reserves fully cover the circulating token supply."
+    },
+    {
+      "check": "custodian_licence",
+      "observed": "valid until 2027-11-28 (400 days)",
+      "threshold": "expired = breach; expiring within 30 days = at-risk",
+      "result": "compliant",
+      "explanation": "Custodian licence is in force."
+    },
+    {
+      "check": "legal_doc_anchor",
+      "observed": "doc hash 0x8f3a2b1c9d4e5f60…",
+      "threshold": "a 32-byte hash of the trust deed / issuance memorandum must be present",
+      "result": "compliant",
+      "explanation": "Governing legal documents are hashed and anchored for verification."
+    },
+    {
+      "check": "audit_freshness",
+      "observed": "last audit 2026-09-24 by KPMG (demo data), opinion \"unqualified\" (30 days ago)",
+      "threshold": "audit must be <= 180 days old",
+      "result": "compliant",
+      "explanation": "Independent audit is recent."
+    },
+    {
+      "check": "attestation_freshness",
+      "observed": "attested 0.0h ago",
+      "threshold": "<= 24h compliant; <= 72h at-risk; older = breach",
+      "result": "compliant",
+      "explanation": "The attestation is current."
+    },
+    {
+      "check": "sanctions_screening",
+      "observed": "screening status \"clear\" via Elliptic (demo)",
+      "threshold": "any flagged counterparty = breach until cleared",
+      "result": "compliant",
+      "explanation": "No sanctioned or high-risk counterparty exposure reported."
+    },
+    {
+      "check": "doc_review_currency",
+      "observed": "next review due 2027-05-12",
+      "threshold": "an overdue legal document review = at-risk",
+      "result": "compliant",
+      "explanation": "Legal documentation review is on schedule."
+    },
+    {
+      "check": "supply_drift",
+      "observed": "coverage moved 0.00 points since the previous check (102.00% -> 102.00%)",
+      "threshold": "movement over 5 points between checks = at-risk",
+      "result": "compliant",
+      "explanation": "Coverage is stable versus the previous check."
+    }
+  ],
+  "custodianNotes": "T-bill holdings marked daily; coverage above target.",
+  "analyst": {
+    "headline": "Tokenized T-Bill Fund is COMPLIANT (compliance score 100/100, reserve coverage 102.00%).",
+    "risks": [],
+    "remediations": [],
+    "outlook": "No action required. The asset remains under continuous monitoring; the next scheduled check will re-verify every control."
+  },
+  "reportHash": "0x62dfd572036f436c7c9d2c2fab0ddce3e225ff94c405f18af2803f6341cc5d6f"
+}

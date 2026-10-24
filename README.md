@@ -1,138 +1,161 @@
-# VeriLex — AI Compliance Agent for Tokenized Real-World Assets
+# VeriLex — Continuous Compliance for Tokenized Real-World Assets
 
-VeriLex continuously verifies that a tokenized real-world asset (RWA) stays
-compliant: its circulating token supply must be backed by custodian-attested
-reserves, its custodian must be licensed, its governing legal documents must
-be anchored and verifiable, and its audits must be fresh. A **Chainlink CRE
-workflow** performs the check end to end — fetching off-chain attestations,
-reading on-chain supply, evaluating a transparent rule set, and anchoring the
-verdict in a smart contract where anyone can verify it.
+**VeriLex is a compliance layer for tokenized RWAs.** A Chainlink CRE workflow
+continuously sweeps a whole portfolio of tokenized assets — a real-estate note,
+a carbon-credit pool, a T-bill fund, SGD-denominated REIT units — verifying each
+one's off-chain backing (custodian reserves, licences, legal documents, audits,
+sanctions screening) against its on-chain supply, scoring it under a versioned
+policy, and anchoring the verdict on-chain. When an asset falls into **BREACH**,
+its own token **freezes transfers** until compliance is restored. Compliance stops
+being a PDF at issuance and becomes a live, enforceable property of the asset.
 
-Built for the **BLI Legal Tech Hackathon 2** (tracks: RWA · LegalTech &
-RegTech · AI × Blockchain) and the **Chainlink CRE bounty**.
+Built for the **BLI Legal Tech Hackathon 2** (RWA · LegalTech & RegTech ·
+AI x Blockchain), targeting the **Chainlink CRE** bounty.
+
+- **Live demo dashboard:** https://xinyuzjj.github.io/verilex/
+- **Demo video:** https://xinyuzjj.github.io/verilex/verilex-demo-remotion.mp4
 
 ## The problem
 
-RWA tokenization is only as trustworthy as its off-chain promises. Today,
-reserve and legal-compliance checks are manual, periodic, and opaque — a
-lapsed custodian licence or a reserve shortfall can stay hidden until the
-next audit PDF, months later. Investors and regulators have no continuous,
-trustless way to know that a token is still fully backed and legally sound.
+A tokenized asset is only as trustworthy as the off-chain reserves and legal
+structure behind it — but after issuance, nobody checks continuously. Reserve
+accounts drain, custodian licences lapse, audits go stale, documents expire,
+and the token keeps trading as if nothing changed. Holders and venues find out
+last. VeriLex closes that gap: every asset, every check cycle, every control —
+with the verdict enforced by the token itself.
 
-## How it works
+## What it does
 
-1. **Cron trigger** — the CRE workflow fires on schedule.
-2. **HTTP capability** — fetches the custodian's attestation (reserves,
-   licence validity, legal document hash, last audit) with DON consensus
-   over every parsed field.
-3. **EVM read** — reads `totalSupply()` of the `TokenizedAsset` contract.
-4. **Agent evaluation** — a transparent rule set (reserve coverage ≥ 100%,
-   licence in force, legal doc anchored, audit ≤ 180 days old) produces a
-   verdict — COMPLIANT / AT-RISK / BREACH — plus a reasoning trail that is
-   hashed (SHA-256 in the agent service).
-5. **EVM write** — a DON-signed report carrying
-   `(token, reserveRatioBps, status, reportHash)` is delivered to the
-   `ComplianceRegistry` contract via `onReport()`, creating a permanent,
-   publicly verifiable compliance history.
+1. **Attest** — each asset's custodian publishes a reserve & legal attestation
+   (reserves, licence validity, trust-deed hash, audit, sanctions screening).
+2. **Fetch** — the CRE workflow pulls attestations with DON consensus and reads
+   each token's `totalSupply()` on-chain.
+3. **Convert** — foreign-currency reserves are converted with a **Chainlink
+   Data Feed** price read on-chain (`FeedConsumer`), never a hardcoded rate.
+4. **Evaluate** — a versioned policy engine runs 7+ checks per asset, computes
+   a **0–100 compliance score**, and an analyst module narrates key risks and
+   concrete remediation steps. Verdicts stay rule-based and explainable — in a
+   legal setting, "the model said so" is not an audit trail.
+5. **Anchor & enforce** — verdict, score, the hash of the full reasoning trail
+   and the policy hash are written to `ComplianceRegistry`. Gated
+   `TokenizedAsset`s consult the registry on every transfer and **freeze while
+   their asset is in BREACH** (issuance and redemption are never blocked).
 
-The same evaluation logic also runs as a standalone agent service
-(`services/agent`), which powers the demo dashboard and can optionally use
-an LLM to draft a plain-language summary (the verdict itself never depends
-on the LLM).
+## The policy — `verilex-policy-2.0`
 
-## Repository layout
+| Check | Compliant | At-risk | Breach | Score penalty (at-risk / breach) |
+|---|---|---|---|---|
+| Reserve coverage | ≥ 100% | 95–99.99% | < 95% | −15 / −45 |
+| Custodian licence | in force | expires ≤ 30 d | lapsed | −10 / −35 |
+| Sanctions screening | clear | — | flagged | — / −40 |
+| Legal doc anchor | hash anchored | — | missing/invalid | — / −25 |
+| Attestation freshness | ≤ 24 h | ≤ 72 h | older | −10 / −20 |
+| Audit freshness | ≤ 180 d | older | — | −10 / — |
+| Doc review currency | on schedule | overdue | — | −8 / — |
+| Coverage drift (vs prior check) | ≤ 5 pts | > 5 pts | — | −5 / — |
 
-| Path | Contents |
-| --- | --- |
-| `contracts/` | Hardhat project: `TokenizedAsset` (ERC-20 RWA) and `ComplianceRegistry` (verdict anchor implementing the Chainlink `onReport` receiver pattern) |
-| `cre/` | Chainlink CRE project: the `compliance-workflow` (TypeScript) |
-| `services/custodian-api/` | Simulated custodian attestation API with healthy / at-risk / breach scenarios |
-| `services/agent/` | Standalone compliance agent (rule engine + reasoning trail + report hash), CLI and HTTP modes |
-| `web/` | Demo dashboard (scenario switcher, verdict, reserve ratio, reasoning trail) |
+Policy hash (SHA-256 of the canonical policy): `0x8eba1689e07a82d292363cdf911d6f83667658ac8e883d80ad080ed6ce03f313`.
+Every on-chain report carries it, so any verdict can be re-derived and audited
+against the exact rule-set that produced it.
 
-## Quick start (local demo)
+## Contracts
 
-Prerequisites: Node 20+, Bun 1.x, the [CRE CLI](https://docs.chain.link/cre),
-a Chainlink Platform account (`cre login`).
+| Contract | Role |
+|---|---|
+| `ComplianceRegistry` | Portfolio-wide verdict anchor: per-asset history (ratio, status, score, trail hash, policy hash), asset enumeration, fail-closed CRE `onReport`. |
+| `TokenizedAsset` | ERC-20 per asset with RWA metadata and a **compliance gate**: transfers revert while the registry's latest verdict is BREACH. |
+| `FeedConsumer` | Chainlink Data Feeds consumer (positivity, round-completeness and staleness checks) used for FX conversion. |
+| `MockV3Aggregator` | Local stand-in for a Chainlink feed so the whole pipeline runs identically on a local chain. |
 
-```bash
-# 1. Contracts on a local chain masquerading as Sepolia (chainId 11155111)
-cd contracts && npm install && npx hardhat node          # terminal 1
-npx hardhat run scripts/deploy.ts --network localhost    # terminal 2
-#    -> copy the two addresses into cre/compliance-workflow/config.staging.json
-
-# 2. Custodian attestation API (demo data)
-node services/custodian-api/server.js                    # :8787
-
-# 3. Standalone agent + dashboard (optional, no CRE account needed)
-node services/agent/agent.js --serve                     # :8788
-#    open web/index.html via any static server
-#    …or anchor all three scenario verdicts on-chain in one go:
-cd contracts && TOKEN_ADDRESS=<asset> REGISTRY_ADDRESS=<registry> \
-  npx hardhat run scripts/submit-demo-reports.ts --network localhost
-
-# 4. The CRE workflow itself
-cd cre/compliance-workflow && bun install
-cd .. && cre workflow simulate compliance-workflow --target staging-settings
-#    staging target RPC points at the local chain (see cre/project.yaml);
-#    try scenarios by setting "scenario": "atrisk" | "breach" in the config
-```
-
-For a public-testnet run, point the `production-settings` RPC in
-`cre/project.yaml` at Sepolia, deploy the contracts with
-`--network sepolia`, set the registry's forwarder to the Chainlink Keystone
-forwarder on Sepolia, and simulate with `--target production-settings`
-(add `--broadcast` to send real transactions).
+Local demo deployment (fresh Hardhat node, deploy order deterministic):
+registry `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0`, feed consumer
+`0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` — see `contracts/scripts/deploy.ts`.
 
 ## Security model
 
-The registry is a compliance anchor, so its write paths are deliberately
-conservative:
-
-- **Fail-closed CRE delivery.** `onReport()` rejects every caller until the
-  owner configures the Chainlink Keystone forwarder, and afterwards accepts
-  reports from that forwarder only. An unconfigured contract can never be
-  filled with unauthenticated verdicts.
-- **Least-privilege direct path.** `submitReport()` is restricted to a single
-  owner-appointed `reporter` (used for local/demo runs); the owner can rotate
-  it, and zero addresses are rejected for both roles.
-- **Input validation.** Reports for the zero token address or with the
-  `Unknown` status are rejected on-chain.
-- **Trusted parties, named.** The custodian attestation is trusted input —
-  in production it must come from the asset's regulated trustee (the CRE
-  workflow fetches it with DON consensus). The contract owner can mint
-  `TokenizedAsset` supply and appoint the reporter/forwarder; those powers
-  are explicit, not hidden.
-- **Known limits.** The verdict itself is computed off-chain by design (the
-  evidence lives off-chain; only its hash is anchored). A newer report
-  replaces the "latest" pointer while the full history stays append-only, so
-  consumers should read the history and the timestamps, not just the latest
-  entry.
+- **Fail-closed reporting.** `ComplianceRegistry.onReport` rejects *every*
+  caller until the owner configures the Chainlink forwarder. A compliance
+  anchor must never silently accept unauthenticated verdicts because setup is
+  incomplete.
+- **Least authority.** Direct report submission is limited to a single
+  configured reporter (or the owner); zero-address and `Unknown`-status /
+  out-of-range-score inputs are rejected on-chain.
+- **No SSRF via the agent API.** The agent's custodian endpoint is operator
+  configuration; it is never taken from an `/analyze` request body.
+- **Input validation before arithmetic.** Supplies, reserves and legal fields
+  are validated before any ratio is computed, including the FX path
+  (foreign-currency attestations without a feed rate are rejected, never
+  silently treated as USD).
+- **Feed hygiene.** Prices must be positive, from a completed round, and fresh
+  within a configured staleness bound.
+- **The gate cannot trap funds.** Only wallet-to-wallet transfers are gated;
+  the issuer can always mint and holders can always burn (redeem), even in
+  BREACH.
+- **Static analysis.** Slither (102 detectors) reports no vulnerabilities;
+  three informational findings were reviewed and are by design (partial tuple
+  use in the feed consumer, a timestamp comparison that *is* the staleness
+  check, and an interface-inheritance style note).
 
 ## Testing
 
-- **Contracts** — `cd contracts && npm test` (Hardhat): 13 tests covering
-  access control, the fail-closed `onReport` path, input validation,
-  append-only history invariants, and end-to-end anchoring of all three
-  verdict scenarios.
-- **Agent** — `node --test services/agent/agent.test.js`: 8 tests covering
-  the four rule checks, verdict boundaries (100% / 95% coverage lines),
-  report-hash behaviour and input validation.
-- **Static analysis** — Slither (102 detectors) reports no findings on the
-  project contracts beyond an informational note about pragma ranges inside
-  OpenZeppelin dependencies; the compiler itself is pinned to 0.8.24.
+**27 automated tests, all passing.**
 
-## Design notes
+- Contracts (Hardhat, 16): reporter/forwarder access control, fail-closed
+  `onReport`, score & policy anchoring, asset enumeration, a 25-step
+  property-style invariant walk over report history, the gate (freeze on
+  breach, issuance/redemption exempt, unfreeze on recovery, owner-only
+  rewiring), and feed consumer behaviour (conversion, updates, stale and
+  non-positive price rejection).
+- Agent (node:test, 11): scenario verdicts and score math for the real demo
+  data, coverage boundaries (100.00 / 99.99 / 95.00 / 94.99), SGD feed
+  conversion and the missing-rate rejection, sanctions flag → breach, stale
+  attestation → breach, overdue doc review, coverage-drift flagging, hash
+  stability and input validation.
 
-- **Explainable, not black-box.** Every verdict ships with the evidence:
-  what was observed, the threshold applied, and the outcome per check.
-- **Trust-minimized anchoring.** Only the verdict, ratio and trail hash go
-  on-chain; the full trail stays off-chain and can be re-hashed by anyone
-  to verify it matches the anchored hash.
-- **Demo data honesty.** The custodian is simulated (real custodians expose
-  similar attestation APIs); everything else — contracts, agent, CRE
-  workflow — is real and runnable.
+## Run it locally
 
-## License
+```bash
+# 1. Local chain (masquerades as Sepolia, chainId 11155111, for the CRE config)
+cd contracts && npx hardhat node
 
-MIT
+# 2. Services (custodian attestations on :8787, agent on :8788)
+cd ../services && node custodian-api/server.js
+node agent/agent.js --serve
+
+# 3. Deploy the portfolio + run the full demo (board, freeze, recovery)
+cd ../contracts && npx hardhat run scripts/deploy.ts --network localhost
+ADDRESSES_JSON=<from deploy output> npx hardhat run scripts/submit-demo-reports.ts --network localhost
+
+# 4. Dashboard (data files are generated by step 3 into web/demo-data/)
+npx serve ../web   # or open the live GitHub Pages demo
+```
+
+Tests: `cd contracts && npx hardhat test` and `node --test services/agent/agent.test.js`.
+
+## Chainlink CRE — status, stated plainly
+
+The CRE workflow in `cre/compliance-workflow/` is original TypeScript written
+against the official CRE SDK; it type-checks cleanly (`tsc --noEmit`) and its
+evaluation logic mirrors the agent that *has* been executed end-to-end locally
+(contracts + services + on-chain anchoring + freeze, all verified in this
+repo's demo run). Running `cre workflow simulate` requires a Chainlink
+organization API key or the browser OAuth flow; both entitlement paths are
+currently blocked on the platform side for our account (the CLI login requires
+organization membership, the API-key creation flow is gated, and the browser
+callback cannot reach this environment). The submission therefore presents the
+locally executed pipeline as the proof and the workflow source as ready to
+simulate/deploy the moment access is granted — no result in this repository is
+a fabricated simulation output.
+
+## Repository layout
+
+```
+contracts/   Hardhat project: registry, gated token, feed consumer, mock feed,
+             16 tests, deploy + end-to-end demo scripts
+cre/         Chainlink CRE workflow (TypeScript, multi-asset portfolio sweep)
+services/    Custodian attestation API (4 assets × 3 scenarios) and the
+             compliance agent: policy engine, analyst, HTTP + CLI
+web/         Portfolio dashboard (data generated by the real pipeline run)
+```
+
+License: MIT.
